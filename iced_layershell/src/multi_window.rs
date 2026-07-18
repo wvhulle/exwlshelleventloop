@@ -593,6 +593,21 @@ where
                 compositor::SurfaceError::OutOfMemory => {
                     panic!("{error:?}");
                 }
+                compositor::SurfaceError::Outdated | compositor::SurfaceError::Lost => {
+                    present_span.finish();
+                    // Reconfigure the surface and redraw, matching iced_winit's handling.
+                    // Without this a surface that goes `Outdated` once (e.g. a second
+                    // layer-shell surface whose swapchain was created before its final
+                    // configure) stays stuck forever: `present` keeps failing, the present
+                    // callback never fires, and the surface never commits again — the
+                    // multi-surface "frozen bar" bug.
+                    compositor.configure_surface(
+                        &mut window.surface,
+                        physical_size.width,
+                        physical_size.height,
+                    );
+                    ev.request_refresh(layer_shell_id, RefreshRequest::NextFrame);
+                }
                 _ => {
                     tracing::error!("Error {error:?} when presenting surface.");
                 }
