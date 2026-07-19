@@ -593,19 +593,38 @@ where
                 compositor::SurfaceError::OutOfMemory => {
                     panic!("{error:?}");
                 }
-                compositor::SurfaceError::Outdated | compositor::SurfaceError::Lost => {
+                compositor::SurfaceError::Outdated => {
                     present_span.finish();
-                    // Reconfigure the surface and redraw, matching iced_winit's handling.
-                    // Without this a surface that goes `Outdated` once (e.g. a second
-                    // layer-shell surface whose swapchain was created before its final
-                    // configure) stays stuck forever: `present` keeps failing, the present
-                    // callback never fires, and the surface never commits again — the
-                    // multi-surface "frozen bar" bug.
+                    // `Outdated`/`Lost` are normal, expected wgpu transients (the swapchain
+                    // is invalidated by a compositor-driven event — the startup configure
+                    // race, a resize, an output/scale change, suspend/resume). A resilient
+                    // render loop must recover from them, exactly as `iced_winit` does.
+                    // Without this recovery here, a second layer-shell surface that goes
+                    // `Outdated` once (its swapchain created before its final configure)
+                    // stays stuck forever: `present` keeps failing, the present callback
+                    // never fires, and the surface never commits again — the multi-surface
+                    // "frozen bar" bug. `Outdated` only needs the swapchain reconfigured.
                     compositor.configure_surface(
                         &mut window.surface,
                         physical_size.width,
                         physical_size.height,
                     );
+                    ev.request_refresh(layer_shell_id, RefreshRequest::NextFrame);
+                }
+                compositor::SurfaceError::Lost => {
+                    present_span.finish();
+                    // A `Lost` surface is gone, not merely stale: it must be recreated, not
+                    // reconfigured (matching `iced_winit`). The raw handle isn't stored on
+                    // `Window`, so regenerate it from the layershellev unit (same as how
+                    // `handle_refresh_event` builds it on window creation).
+                    if let Some(unit) = ev.get_unit_with_id(layer_shell_id) {
+                        let wrapper = Arc::new(unit.gen_wrapper());
+                        window.surface = compositor.create_surface(
+                            wrapper,
+                            physical_size.width,
+                            physical_size.height,
+                        );
+                    }
                     ev.request_refresh(layer_shell_id, RefreshRequest::NextFrame);
                 }
                 _ => {
