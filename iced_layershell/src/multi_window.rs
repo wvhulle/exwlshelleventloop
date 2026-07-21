@@ -1,7 +1,7 @@
 use crate::reexport::{PopupAnchor, PopupConstraintAdjustment};
 use crate::{
     DefaultStyle,
-    actions::{IcedNewPopupSettings, LayerShellCustomActionWithId},
+    actions::{IcedNewPopupSettings, LayerShellCustomActionWithId, LayerShellOutputEvent},
     ime_preedit::ImeState,
     multi_window::window_manager::WindowManager,
     settings::VirtualKeyboardSettings,
@@ -65,7 +65,9 @@ pub fn run<P>(
 where
     P: IcedProgram + 'static,
     P::Theme: DefaultStyle,
-    P::Message: 'static + TryInto<LayerShellCustomActionWithId, Error = P::Message>,
+    P::Message: 'static
+        + TryInto<LayerShellCustomActionWithId, Error = P::Message>
+        + From<LayerShellOutputEvent>,
 {
     use futures::task;
     use layershellev::calloop::channel::channel;
@@ -213,6 +215,10 @@ where
                 waiting_layer_shell_events
                     .push_back((layer_shell_id, IcedLayerShellEvent::NormalDispatch));
             }
+            LayerShellEvent::OutputConnected(name) => {
+                waiting_layer_shell_events
+                    .push_back((layer_shell_id, IcedLayerShellEvent::OutputConnected(name)));
+            }
             _ => {}
         }
         loop {
@@ -294,7 +300,9 @@ where
     C: Compositor<Renderer = P::Renderer> + 'static,
     E: Executor + 'static,
     P::Theme: DefaultStyle,
-    P::Message: 'static + TryInto<LayerShellCustomActionWithId, Error = P::Message>,
+    P::Message: 'static
+        + TryInto<LayerShellCustomActionWithId, Error = P::Message>
+        + From<LayerShellOutputEvent>,
 {
     pub fn new(
         application: Instance<P>,
@@ -396,6 +404,13 @@ where
             }
             IcedLayerShellEvent::UserAction(user_action) => {
                 self.handle_user_action(ev, user_action)
+            }
+            IcedLayerShellEvent::OutputConnected(name) => {
+                // Deliver as a normal application message: `run_action` sees a
+                // value that isn't a layer-shell action, so it lands in
+                // `messages` and reaches `update` on the next dispatch.
+                let message = P::Message::from(LayerShellOutputEvent::Connected { name });
+                self.handle_user_action(ev, Action::Output(message));
             }
             IcedLayerShellEvent::NormalDispatch => self.handle_normal_dispatch(ev),
         }

@@ -2505,6 +2505,21 @@ impl<T: 'static> WindowState<T> {
                             output_display.clone(),
                             ZxdgOutputInfo::new(zxdgoutput.clone()),
                         ));
+                        // Tell the program a monitor appeared (by name) so it can, e.g.,
+                        // open a per-output surface itself. Independent of `AllScreens`
+                        // auto-window-creation below, and fires for outputs already
+                        // present at startup as well as later hotplugs.
+                        if let Some(name) = window_state
+                            .output_state()
+                            .info(output_display)
+                            .and_then(|info| info.name)
+                        {
+                            window_state.handle_event(
+                                &mut *event_handler,
+                                LayerShellEvent::OutputConnected(name),
+                                None,
+                            );
+                        }
                         if !window_state.is_allscreens() {
                             continue;
                         }

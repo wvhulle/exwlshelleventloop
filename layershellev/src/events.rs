@@ -71,6 +71,13 @@ pub enum LayerShellEvent<'a, T, Message> {
     NormalDispatch,
     /// It return the event you passed with message_receiver, and return it back.
     UserEvent(Message),
+    /// A `wl_output` (monitor) was announced by the compositor, carrying its
+    /// name (e.g. `"DP-1"`). Fires for outputs already present when the program
+    /// starts as well as for later hotplugs, so it doubles as the initial
+    /// enumeration. Output *removal* is not a distinct event: the units bound
+    /// to a vanished output are torn down and surface as ordinary window-close
+    /// events instead.
+    OutputConnected(String),
 }
 
 /// Define the output for new layershell

@@ -107,6 +107,9 @@ pub enum IcedLayerShellEvent<Message> {
     Window(WindowEvent),
     UserAction(Action<Message>),
     NormalDispatch,
+    /// A monitor was announced by the compositor, carrying its name. Turned into
+    /// an application message via `From<LayerShellOutputEvent>`.
+    OutputConnected(String),
 }
 
 impl From<&DispatchMessage> for WindowEvent {

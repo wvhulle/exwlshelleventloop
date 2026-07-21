@@ -582,7 +582,8 @@ impl<P: Program> SingleApplication<P> {
         P::Message: std::fmt::Debug
             + Send
             + 'static
-            + TryInto<LayerShellCustomActionWithId, Error = P::Message>,
+            + TryInto<LayerShellCustomActionWithId, Error = P::Message>
+            + From<crate::actions::LayerShellOutputEvent>,
     {
         let settings = self.settings;
 

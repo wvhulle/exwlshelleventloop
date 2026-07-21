@@ -660,7 +660,8 @@ impl<P: Program> Daemon<P> {
         P::Message: std::fmt::Debug
             + Send
             + 'static
-            + TryInto<LayerShellCustomActionWithId, Error = P::Message>,
+            + TryInto<LayerShellCustomActionWithId, Error = P::Message>
+            + From<crate::actions::LayerShellOutputEvent>,
     {
         let settings = self.settings;
         #[cfg(all(feature = "debug", not(target_arch = "wasm32")))]

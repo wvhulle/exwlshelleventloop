@@ -166,6 +166,20 @@ pub enum LayerShellCustomAction {
     ForgetLastOutput,
 }
 
+/// A compositor output (monitor) event delivered to the application. The
+/// `to_layer_message` macro injects an `OutputEvent(LayerShellOutputEvent)`
+/// variant plus a `From<LayerShellOutputEvent>` impl, so a program reacts to
+/// monitors by matching this in its `update`.
+///
+/// Only connection is reported here: an output is identified by its name
+/// (e.g. `"DP-1"`), fired both for outputs present at startup and for later
+/// hotplugs. A *disconnected* output tears its surfaces down, which the program
+/// already observes as ordinary `window::close_events`.
+#[derive(Debug, Clone)]
+pub enum LayerShellOutputEvent {
+    Connected { name: String },
+}
+
 /// Please do not use this struct directly
 /// Use macro to_layer_message instead
 #[derive(Debug, Clone)]

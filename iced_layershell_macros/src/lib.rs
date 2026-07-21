@@ -56,9 +56,17 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
                 NewInputPanel { settings: iced_layershell::reexport::NewInputPanelSettings, id: iced_layershell::reexport::IcedId },
                 RemoveWindow(iced_layershell::reexport::IcedId),
                 ForgetLastOutput,
+                /// A compositor output (monitor) event, delivered to `update`.
+                /// See [`iced_layershell::actions::LayerShellOutputEvent`].
+                OutputEvent(iced_layershell::actions::LayerShellOutputEvent),
             };
 
             let impl_quote = quote! {
+                impl #impl_gen ::core::convert::From<iced_layershell::actions::LayerShellOutputEvent> for #ident #ty_gen #where_gen {
+                    fn from(event: iced_layershell::actions::LayerShellOutputEvent) -> Self {
+                        Self::OutputEvent(event)
+                    }
+                }
                 impl #impl_gen #ident #ty_gen #where_gen {
                     fn layershell_open(settings: iced_layershell::reexport::NewLayerShellSettings) -> (iced_layershell::reexport::IcedId, iced_layershell::reexport::Task<Self>) {
                         let id = iced_layershell::reexport::IcedId::unique();
