@@ -219,6 +219,10 @@ where
                 waiting_layer_shell_events
                     .push_back((layer_shell_id, IcedLayerShellEvent::OutputConnected(name)));
             }
+            LayerShellEvent::OutputDisconnected(name) => {
+                waiting_layer_shell_events
+                    .push_back((layer_shell_id, IcedLayerShellEvent::OutputDisconnected(name)));
+            }
             _ => {}
         }
         loop {
@@ -410,6 +414,10 @@ where
                 // value that isn't a layer-shell action, so it lands in
                 // `messages` and reaches `update` on the next dispatch.
                 let message = P::Message::from(LayerShellOutputEvent::Connected { name });
+                self.handle_user_action(ev, Action::Output(message));
+            }
+            IcedLayerShellEvent::OutputDisconnected(name) => {
+                let message = P::Message::from(LayerShellOutputEvent::Disconnected { name });
                 self.handle_user_action(ev, Action::Output(message));
             }
             IcedLayerShellEvent::NormalDispatch => self.handle_normal_dispatch(ev),

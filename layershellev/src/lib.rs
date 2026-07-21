@@ -955,6 +955,9 @@ pub struct WindowState<T> {
     repeat_delay: Option<KeyboardTokenState>,
     to_remove_tokens: Vec<RegistrationToken>,
     closed_ids: Vec<id::Id>,
+    /// Names of outputs removed since the last dispatch, drained alongside
+    /// `closed_ids` into `LayerShellEvent::OutputDisconnected`.
+    disconnected_outputs: Vec<String>,
 
     to_be_released_key: Option<VirtualKeyRelease>,
 
@@ -1501,6 +1504,7 @@ impl<T> Default for WindowState<T> {
             to_remove_tokens: Vec::new(),
             to_be_released_key: None,
             closed_ids: Vec::new(),
+            disconnected_outputs: Vec::new(),
 
             last_wloutput: None,
             last_unit_index: 0,
@@ -1666,6 +1670,12 @@ impl<T: 'static> OutputHandler for WindowState<T> {
         _qh: &QueueHandle<Self>,
         output: wl_output::WlOutput,
     ) {
+        // sctk invokes this before dropping the output from `OutputState`, so
+        // the name is still resolvable here. Queue it for the same drain that
+        // emits the per-window close events below.
+        if let Some(name) = self.output_state().info(&output).and_then(|info| info.name) {
+            self.disconnected_outputs.push(name);
+        }
         if self
             .last_wloutput
             .as_ref()
@@ -2991,6 +3001,16 @@ impl<T: 'static> WindowState<T> {
                 );
             }
             window_state.closed_ids.clear();
+
+            // After the per-window close events, report the output-level removal
+            // by name (mirror of `OutputConnected`).
+            for name in std::mem::take(&mut window_state.disconnected_outputs) {
+                window_state.handle_event(
+                    &mut *event_handler,
+                    LayerShellEvent::OutputDisconnected(name),
+                    None,
+                );
+            }
             if window_state.units.is_empty()
                 && !window_state.is_allscreens()
                 && !window_state.is_background()
