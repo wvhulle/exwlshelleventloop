@@ -1049,6 +1049,25 @@ impl<T> WindowState<T> {
         self.last_wloutput.take();
     }
 
+    fn output_named(&self, name: &str) -> Option<WlOutput> {
+        let output_state = self.output_state.as_ref()?;
+        self.outputs
+            .iter()
+            .find(|output| {
+                output_state
+                    .info(output)
+                    .and_then(|info| info.name)
+                    .is_some_and(|advertised| advertised == name)
+            })
+            .or_else(|| {
+                self.xdg_info_cache
+                    .iter()
+                    .find(|(_, info)| info.name == name)
+                    .map(|(output, _)| output)
+            })
+            .cloned()
+    }
+
     fn last_output(&mut self) -> Option<WlOutput> {
         if self.last_wloutput.is_none() {
             self.last_wloutput = self.outputs.get(self.last_unit_index).cloned();
@@ -2509,12 +2528,23 @@ impl<T: 'static> WindowState<T> {
                         );
                     }
                     (_, DispatchMessageInner::NewDisplay(output_display)) => {
-                        let zxdgoutput = xdg_output_manager.get_xdg_output(output_display, &qh, ());
-
-                        window_state.xdg_info_cache.push((
-                            output_display.clone(),
-                            ZxdgOutputInfo::new(zxdgoutput.clone()),
-                        ));
+                        let cached = window_state
+                            .xdg_info_cache
+                            .iter()
+                            .find(|(cached, _)| cached.id() == output_display.id())
+                            .map(|(_, info)| info.zxdgoutput.clone());
+                        let zxdgoutput = match cached {
+                            Some(zxdgoutput) => zxdgoutput,
+                            None => {
+                                let zxdgoutput =
+                                    xdg_output_manager.get_xdg_output(output_display, &qh, ());
+                                window_state.xdg_info_cache.push((
+                                    output_display.clone(),
+                                    ZxdgOutputInfo::new(zxdgoutput.clone()),
+                                ));
+                                zxdgoutput
+                            }
+                        };
                         // Tell the program a monitor appeared (by name) so it can, e.g.,
                         // open a per-output surface itself. Independent of `AllScreens`
                         // auto-window-creation below, and fires for outputs already
@@ -2640,11 +2670,16 @@ impl<T: 'static> WindowState<T> {
                         )) => {
                             let output = match output_type {
                                 OutputOption::Output(output) => Some(output),
-                                OutputOption::OutputName(name) => window_state
-                                    .xdg_info_cache
-                                    .iter()
-                                    .find(|(_, info)| info.name == *name)
-                                    .map(|(output, _)| output.clone()),
+                                OutputOption::OutputName(name) => {
+                                    let Some(output) = window_state.output_named(&name) else {
+                                        log::warn!(
+                                            target: "layershellev",
+                                            "no output named {name}, skip creating layer surface"
+                                        );
+                                        continue;
+                                    };
+                                    Some(output)
+                                }
                                 OutputOption::Active => None,
                                 OutputOption::LastOutput => window_state.last_output(),
                             };
@@ -2902,11 +2937,7 @@ impl<T: 'static> WindowState<T> {
                         )) => {
                             let output = match output_type {
                                 OutputOption::Output(output) => Some(output),
-                                OutputOption::OutputName(name) => window_state
-                                    .xdg_info_cache
-                                    .iter()
-                                    .find(|(_, info)| info.name == *name)
-                                    .map(|(output, _)| output.clone()),
+                                OutputOption::OutputName(name) => window_state.output_named(&name),
                                 OutputOption::Active => None,
                                 OutputOption::LastOutput => window_state.last_output(),
                             };
