@@ -1702,10 +1702,14 @@ impl<T: 'static> OutputHandler for WindowState<T> {
         {
             self.last_wloutput.take();
         }
-        let outputs_removed = self.outputs.extract_if(.., |o| o == &output);
+        let outputs_removed: Vec<_> = self.outputs.extract_if(.., |o| o == &output).collect();
         for output_removed in outputs_removed {
-            self.xdg_info_cache
-                .retain(|info| info.0.id() != output_removed.id());
+            let pruned = self
+                .xdg_info_cache
+                .extract_if(.., |(cached, _)| cached.id() == output_removed.id());
+            for (_, info) in pruned {
+                info.zxdgoutput.destroy();
+            }
         }
 
         let removed_states = self.units.extract_if(.., |unit| {
@@ -2249,20 +2253,21 @@ impl<T: 'static> WindowState<T> {
             }
             self.background_surface = Some(background_surface);
         } else if !self.is_allscreens() {
-            let mut output = None;
-
             let (binded_output, binded_xdginfo) = match self.start_mode.clone() {
                 StartMode::TargetScreen(name) => {
-                    if let Some(cache) = self
-                        .xdg_info_cache
-                        .iter()
-                        .find(|(_, info)| info.name == *name)
-                        .cloned()
-                    {
-                        output = Some(cache.clone());
+                    let binded_output = self.output_named(&name);
+                    if binded_output.is_none() {
+                        log::warn!(
+                            target: "layershellev",
+                            "no output named {name}, falling back to compositor default"
+                        );
                     }
-                    let binded_output = output.as_ref().map(|(output, _)| output).cloned();
-                    let binded_xdginfo = output.as_ref().map(|(_, xdginfo)| xdginfo).cloned();
+                    let binded_xdginfo = binded_output.as_ref().and_then(|output| {
+                        self.xdg_info_cache
+                            .iter()
+                            .find(|(cached, _)| cached.id() == output.id())
+                            .map(|(_, xdginfo)| xdginfo.clone())
+                    });
                     (binded_output, binded_xdginfo)
                 }
                 StartMode::TargetOutput(output) => (Some(output), None),
@@ -2987,6 +2992,7 @@ impl<T: 'static> WindowState<T> {
                                 .size((width, height))
                                 .viewport(viewport)
                                 .fractional_scale(fractional_scale)
+                                .wl_output(Some(output))
                                 .binding(info)
                                 .becreated(true)
                                 .build(),
