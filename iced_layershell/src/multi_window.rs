@@ -220,8 +220,10 @@ where
                     .push_back((layer_shell_id, IcedLayerShellEvent::OutputConnected(name)));
             }
             LayerShellEvent::OutputDisconnected(name) => {
-                waiting_layer_shell_events
-                    .push_back((layer_shell_id, IcedLayerShellEvent::OutputDisconnected(name)));
+                waiting_layer_shell_events.push_back((
+                    layer_shell_id,
+                    IcedLayerShellEvent::OutputDisconnected(name),
+                ));
             }
             _ => {}
         }
@@ -822,6 +824,11 @@ where
                     .get_wlsurface()
                     .set_input_region(self.wl_input_region.as_ref());
                 layer_shell_window.get_wlsurface().commit();
+            }
+            LayerShellCustomAction::RequestActivationToken(sink) => {
+                ref_layer_shell_window!(ev, iced_id, layer_shell_id, layer_shell_window);
+                let surface = layer_shell_window.get_wlsurface().clone();
+                ev.request_activation_token(&surface, sink);
             }
             LayerShellCustomAction::VirtualKeyboardPressed { key } => {
                 use layershellev::reexport::wayland_client::KeyState;

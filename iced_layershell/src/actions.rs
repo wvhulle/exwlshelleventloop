@@ -5,7 +5,8 @@ use layershellev::reexport::xdg_positioner::{
     Gravity as PopupGravity,
 };
 use layershellev::{
-    NewInputPanelSettings, NewLayerShellSettings, NewXdgWindowSettings, PopupPlacement,
+    ActivationTokenSink, NewInputPanelSettings, NewLayerShellSettings, NewXdgWindowSettings,
+    PopupPlacement,
 };
 
 use std::sync::Arc;
@@ -145,6 +146,11 @@ pub enum LayerShellCustomAction {
         id: IcedId,
     },
     SetInputRegion(ActionCallback),
+    /// Mint an `xdg_activation_v1` token on behalf of the addressed surface and
+    /// hand it to the sink. A layer shell has no toplevel to raise itself, so
+    /// the token is only useful once passed to the client that should be
+    /// focused.
+    RequestActivationToken(ActivationTokenSink),
     NewPopUp {
         settings: IcedNewPopupSettings,
         id: IcedId,

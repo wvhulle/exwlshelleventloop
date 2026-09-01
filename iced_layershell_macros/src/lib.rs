@@ -39,6 +39,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
             let additional_variants = quote! {
                 AnchorChange{id: iced_layershell::reexport::IcedId, anchor: iced_layershell::reexport::Anchor},
                 SetInputRegion{ id: iced_layershell::reexport::IcedId, callback: iced_layershell::actions::ActionCallback },
+                RequestActivationToken{ id: iced_layershell::reexport::IcedId, sink: iced_layershell::reexport::ActivationTokenSink },
                 AnchorSizeChange{id: iced_layershell::reexport::IcedId, anchor:iced_layershell::reexport::Anchor, size: (u32, u32)},
                 LayerChange{id: iced_layershell::reexport::IcedId, layer:iced_layershell::reexport::Layer},
                 /// Margin: top, left, bottom, right
@@ -110,6 +111,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
 
                         match self {
                             Self::SetInputRegion{ id, callback } => Ok(LayerShellCustomActionWithId::new(Some(id), LayerShellCustomAction::SetInputRegion(callback))),
+                            Self::RequestActivationToken{ id, sink } => Ok(LayerShellCustomActionWithId::new(Some(id), LayerShellCustomAction::RequestActivationToken(sink))),
                             Self::AnchorChange { id, anchor } => Ok(LayerShellCustomActionWithId::new(Some(id), LayerShellCustomAction::AnchorChange(anchor))),
                             Self::AnchorSizeChange { id, anchor, size } => Ok(LayerShellCustomActionWithId::new(Some(id), LayerShellCustomAction::AnchorSizeChange(anchor, size))),
                             Self::LayerChange { id, layer } => Ok(LayerShellCustomActionWithId::new(Some(id), LayerShellCustomAction::LayerChange(layer))),
@@ -139,6 +141,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
             let additional_variants = quote! {
                 AnchorChange(iced_layershell::reexport::Anchor),
                 SetInputRegion(iced_layershell::actions::ActionCallback),
+                RequestActivationToken(iced_layershell::reexport::ActivationTokenSink),
                 // Ancher and Size (width, height)
                 AnchorSizeChange(iced_layershell::reexport::Anchor, (u32, u32)),
                 LayerChange(iced_layershell::reexport::Layer),
@@ -161,6 +164,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
 
                         match self {
                             Self::SetInputRegion(callback) => Ok(LayerShellCustomActionWithId::new(None, LayerShellCustomAction::SetInputRegion(callback))),
+                            Self::RequestActivationToken(sink) => Ok(LayerShellCustomActionWithId::new(None, LayerShellCustomAction::RequestActivationToken(sink))),
                             Self::AnchorChange(anchor) => Ok(LayerShellCustomActionWithId::new(None, LayerShellCustomAction::AnchorChange(anchor))),
                             Self::AnchorSizeChange(anchor, size) => Ok(LayerShellCustomActionWithId::new(None, LayerShellCustomAction::AnchorSizeChange(anchor, size))),
                             Self::LayerChange(layer) => Ok(LayerShellCustomActionWithId::new(None, LayerShellCustomAction::LayerChange(layer))),
