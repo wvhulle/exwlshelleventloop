@@ -951,6 +951,8 @@ pub struct WindowState<T> {
     with_connection: Option<WithConnection>,
     connection: Option<Connection>,
     event_queue: Option<EventQueue<WindowState<T>>>,
+    /// Outlives `event_queue`, which the running loop takes ownership of.
+    queue_handle: Option<QueueHandle<WindowState<T>>>,
     wl_compositor: Option<WlCompositor>,
     xdg_output_manager: Option<ZxdgOutputManagerV1>,
     wmbase: Option<XdgWmBase>,
@@ -1528,6 +1530,7 @@ impl<T> Default for WindowState<T> {
             with_connection: None,
             connection: None,
             event_queue: None,
+            queue_handle: None,
             wl_compositor: None,
             shm: None,
             wmbase: None,
@@ -1627,11 +1630,11 @@ impl<T> WindowState<T> {
     where
         T: 'static,
     {
-        let (Some(activation), Some(event_queue)) = (&self.xdg_activation, &self.event_queue)
+        let (Some(activation), Some(queue_handle)) = (&self.xdg_activation, &self.queue_handle)
         else {
             return;
         };
-        let token = activation.get_activation_token(&event_queue.handle(), sink);
+        let token = activation.get_activation_token(queue_handle, sink);
         if let (Some(seat), Some(serial)) =
             (&self.seat_back, self.button_serial.or(self.enter_serial))
         {
@@ -2264,6 +2267,7 @@ impl<T: 'static> WindowState<T> {
         let (globals, mut event_queue) = registry_queue_init::<Self>(&connection)?;
 
         let qh = event_queue.handle();
+        self.queue_handle = Some(qh.clone());
         self.registry_state = Some(RegistryState::new(&globals));
         self.output_state = Some(OutputState::new(&globals, &qh));
         let seat_state = SeatState::new(&globals, &qh);
