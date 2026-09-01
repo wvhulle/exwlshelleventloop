@@ -208,6 +208,10 @@ use wayland_protocols::wp::text_input::zv3::client::{
     zwp_text_input_manager_v3::ZwpTextInputManagerV3,
     zwp_text_input_v3::{self, ContentHint, ContentPurpose, ZwpTextInputV3},
 };
+use wayland_protocols::xdg::activation::v1::client::{
+    xdg_activation_token_v1::{self, XdgActivationTokenV1},
+    xdg_activation_v1::XdgActivationV1,
+};
 use wayland_protocols::xdg::decoration::zv1::client::{
     zxdg_decoration_manager_v1::ZxdgDecorationManagerV1,
     zxdg_toplevel_decoration_v1::{self, ZxdgToplevelDecorationV1},
@@ -1042,6 +1046,33 @@ impl From<Connection> for WithConnection {
     }
 }
 
+/// Receives the string produced by `xdg_activation_token_v1::done`.
+///
+/// A layer surface has no toplevel of its own to raise, so activation is always
+/// performed on behalf of another client: the token travels out of process and
+/// is redeemed there. The sink is the hand-off point.
+#[derive(Clone)]
+pub struct ActivationTokenSink(Arc<dyn Fn(String) + Send + Sync>);
+
+impl ActivationTokenSink {
+    pub fn new<F>(deliver: F) -> Self
+    where
+        F: Fn(String) + Send + Sync + 'static,
+    {
+        Self(Arc::new(deliver))
+    }
+
+    fn deliver(&self, token: String) {
+        (self.0)(token);
+    }
+}
+
+impl Debug for ActivationTokenSink {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ActivationTokenSink")
+    }
+}
+
 /// main state, store the main information
 #[derive(Debug)]
 pub struct WindowState<T> {
@@ -1117,6 +1148,10 @@ pub struct WindowState<T> {
     text_inputs: Vec<ZwpTextInputV3>,
 
     xdg_decoration_manager: Option<ZxdgDecorationManagerV1>,
+
+    xdg_activation: Option<XdgActivationV1>,
+    /// Outlives `event_queue`, which the running loop takes ownership of.
+    queue_handle: Option<QueueHandle<WindowState<T>>>,
 
     ime_purpose: ImePurpose,
     ime_allowed: bool,
@@ -1680,6 +1715,8 @@ impl<T> Default for WindowState<T> {
             ime_allowed: false,
 
             xdg_decoration_manager: None,
+            xdg_activation: None,
+            queue_handle: None,
         }
     }
 }
@@ -1700,6 +1737,31 @@ impl<T> WindowState<T> {
     }
 
     /// use [id::Id] to get the mut [WindowStateUnit]
+    /// Ask the compositor for an activation token on behalf of `surface`.
+    ///
+    /// The serial of the most recent pointer interaction is attached when there
+    /// is one: compositors that guard against focus stealing only honour a
+    /// token backed by recent input, and grant urgency rather than focus
+    /// otherwise. Silently does nothing when the compositor lacks
+    /// `xdg_activation_v1`.
+    pub fn request_activation_token(&self, surface: &WlSurface, sink: ActivationTokenSink)
+    where
+        T: 'static,
+    {
+        let (Some(activation), Some(queue_handle)) = (&self.xdg_activation, &self.queue_handle)
+        else {
+            return;
+        };
+        let token = activation.get_activation_token(queue_handle, sink);
+        if let (Some(seat), Some(serial)) =
+            (&self.seat_back, self.button_serial.or(self.enter_serial))
+        {
+            token.set_serial(serial, seat);
+        }
+        token.set_surface(surface);
+        token.commit();
+    }
+
     pub fn get_mut_unit_with_id(&mut self, id: id::Id) -> Option<&mut WindowStateUnit<T>> {
         self.units.iter_mut().find(|unit| unit.id == id)
     }
@@ -2386,6 +2448,23 @@ impl<T> Dispatch<ExtSessionLockV1, ()> for WindowState<T> {
     }
 }
 
+impl<T> Dispatch<XdgActivationTokenV1, ActivationTokenSink> for WindowState<T> {
+    fn event(
+        _state: &mut Self,
+        proxy: &XdgActivationTokenV1,
+        event: xdg_activation_token_v1::Event,
+        sink: &ActivationTokenSink,
+        _connection: &Connection,
+        _qh: &QueueHandle<Self>,
+    ) {
+        let xdg_activation_token_v1::Event::Done { token } = event else {
+            return;
+        };
+        sink.deliver(token);
+        proxy.destroy();
+    }
+}
+
 delegate_noop!(@<T> WindowState<T>: ignore WlCompositor); // WlCompositor is need to create a surface
 delegate_noop!(@<T> WindowState<T>: ignore WlOutput); // output is need to place layer_shell, although here
 // it is not used
@@ -2433,6 +2512,7 @@ delegate_noop!(@<T> WindowState<T>: ignore ZwpTextInputManagerV3);
 delegate_noop!(@<T> WindowState<T>: ignore ZwpInputPanelSurfaceV1);
 delegate_noop!(@<T> WindowState<T>: ignore ZwpInputPanelV1);
 
+delegate_noop!(@<T> WindowState<T>: ignore XdgActivationV1);
 delegate_noop!(@<T> WindowState<T>: ignore ZxdgDecorationManagerV1);
 delegate_noop!(@<T> WindowState<T>: ignore ZxdgToplevelDecorationV1);
 
@@ -2494,6 +2574,10 @@ impl<T: 'static> WindowState<T> {
         let input_panel = globals.bind::<ZwpInputPanelV1, _, _>(&qh, 1..=1, ()).ok();
 
         self.text_input_manager = text_input_manager;
+
+        self.xdg_activation = globals.bind::<XdgActivationV1, _, _>(&qh, 1..=1, ()).ok();
+        self.queue_handle = Some(qh.clone());
+
         event_queue.blocking_dispatch(&mut self)?; // then make a dispatch
 
         // OutputState bound its own xdg_outputs before the dispatch above, so output info is

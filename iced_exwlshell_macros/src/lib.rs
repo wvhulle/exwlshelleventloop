@@ -39,6 +39,7 @@ pub fn to_exwlshell_message(
             LayoutChange{id: iced_exwlshell::reexport::IcedId, anchor: iced_exwlshell::reexport::Anchor, size: iced_exwlshell::reexport::LayerSize},
             /// Action, input region
             SetInputRegion{ id: iced_exwlshell::reexport::IcedId, callback: iced_exwlshell::actions::ActionCallback },
+            RequestActivationToken{ id: iced_exwlshell::reexport::IcedId, sink: iced_exwlshell::reexport::ActivationTokenSink },
             /// Action, layer change
             LayerChange{id: iced_exwlshell::reexport::IcedId, layer:iced_exwlshell::reexport::Layer},
             /// Action, margin change Margin: top, left, bottom, right
@@ -119,6 +120,7 @@ pub fn to_exwlshell_message(
 
                     match self {
                         Self::SetInputRegion{ id, callback } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::SetInputRegion(callback))),
+                        Self::RequestActivationToken{ id, sink } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::RequestActivationToken(sink))),
                         Self::LayoutChange { id, anchor, size } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::LayoutChange { anchor, size })),
                         Self::LayerChange { id, layer } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::LayerChange(layer))),
                         Self::MarginChange { id, margin } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::MarginChange(margin))),
@@ -243,6 +245,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
             let additional_variants = quote! {
                 LayoutChange{id: iced_exwlshell::reexport::IcedId, anchor: iced_exwlshell::reexport::Anchor, size: iced_exwlshell::reexport::LayerSize},
                 SetInputRegion{ id: iced_exwlshell::reexport::IcedId, callback: iced_exwlshell::actions::ActionCallback },
+                RequestActivationToken{ id: iced_exwlshell::reexport::IcedId, sink: iced_exwlshell::reexport::ActivationTokenSink },
                 LayerChange{id: iced_exwlshell::reexport::IcedId, layer:iced_exwlshell::reexport::Layer},
                 /// Margin: top, left, bottom, right
                 MarginChange{id: iced_exwlshell::reexport::IcedId, margin: (i32, i32, i32, i32)},
@@ -307,6 +310,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
 
                         match self {
                             Self::SetInputRegion{ id, callback } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::SetInputRegion(callback))),
+                            Self::RequestActivationToken{ id, sink } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::RequestActivationToken(sink))),
                             Self::LayoutChange { id, anchor, size } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::LayoutChange{ anchor, size })),
                             Self::LayerChange { id, layer } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::LayerChange(layer))),
                             Self::MarginChange { id, margin } => Ok(ExwlShellCustomActionWithId::new(Some(id), ExwlShellCustomAction::MarginChange(margin))),
@@ -336,6 +340,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
             let additional_variants = quote! {
                 LayoutChange { anchor: iced_exwlshell::reexport::Anchor, size: iced_exwlshell::reexport::LayerSize },
                 SetInputRegion(iced_exwlshell::actions::ActionCallback),
+                RequestActivationToken(iced_exwlshell::reexport::ActivationTokenSink),
                 LayerChange(iced_exwlshell::reexport::Layer),
                 /// Margin: top, left, bottom, right
                 MarginChange((i32, i32, i32, i32)),
@@ -356,6 +361,7 @@ pub fn to_layer_message(attr: TokenStream2, input: TokenStream2) -> manyhow::Res
 
                         match self {
                             Self::SetInputRegion(callback) => Ok(ExwlShellCustomActionWithId::new(None, ExwlShellCustomAction::SetInputRegion(callback))),
+                            Self::RequestActivationToken(sink) => Ok(ExwlShellCustomActionWithId::new(None, ExwlShellCustomAction::RequestActivationToken(sink))),
                             Self::LayoutChange { anchor, size } => Ok(ExwlShellCustomActionWithId::new(None, ExwlShellCustomAction::LayoutChange { anchor, size })),
                             Self::LayerChange(layer) => Ok(ExwlShellCustomActionWithId::new(None, ExwlShellCustomAction::LayerChange(layer))),
 
