@@ -884,6 +884,11 @@ where
                 ref_mut_exshell_window!(ev, iced_id, ex_shell_id, layer_shell_window);
                 exshell_window.set_keyboard_interactivity(keyboard_interactivity);
             }
+            ExwlShellCustomAction::RequestActivationToken(sink) => {
+                ref_mut_exshell_window!(ev, iced_id, ex_shell_id, exshell_window);
+                let surface = exshell_window.get_wlsurface().clone();
+                ev.request_activation_token(&surface, sink);
+            }
             ExwlShellCustomAction::SetInputRegion(set_region) => {
                 ref_mut_exshell_window!(ev, iced_id, ex_shell_id, layer_shell_window);
                 let set_region = set_region.0;
