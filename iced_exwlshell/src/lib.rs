@@ -18,6 +18,7 @@ mod surface_regions;
 pub use surface_regions::{BlurRegions, InputRects};
 
 pub mod reexport {
+    pub use exwlshellev::ActivationTokenSink;
     pub use exwlshellev::Margin;
     pub use exwlshellev::NewInputPanelSettings;
     pub use exwlshellev::NewLayerShellSettings;
