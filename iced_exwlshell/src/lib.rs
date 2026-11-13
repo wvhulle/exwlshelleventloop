@@ -15,7 +15,9 @@ mod window;
 pub mod settings;
 mod surface_regions;
 
-pub use surface_regions::{BlurRegions, InputRegionActions, IntoRegionAction};
+pub use surface_regions::{
+    BlurRegions, InputRegionActions, IntoRegionAction, SurfaceRegionsCollector,
+};
 
 pub mod reexport {
     pub use exwlshellev::ActivationTokenSink;
